@@ -5,14 +5,16 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.prm392project.data.model.UserProfileData
 import com.example.prm392project.data.remote.ApiResponse
-import com.example.prm392project.data.remote.api.UserProfileData
-import com.example.prm392project.data.repository.AuthRepository
+import com.example.prm392project.data.repository.DefaultProfileRepository
+import com.example.prm392project.data.repository.ProfileRepository
 import kotlinx.coroutines.launch
 
 class ProfileViewModel(
-    private val repo: AuthRepository = AuthRepository()
+    private val repository: ProfileRepository = DefaultProfileRepository()
 ) : ViewModel() {
+
     var profile by mutableStateOf<UserProfileData?>(null)
         private set
 
@@ -20,7 +22,7 @@ class ProfileViewModel(
         private set
 
     var errorMessage by mutableStateOf<String?>(null)
-        set
+        private set
 
     init {
         loadProfile()
@@ -30,24 +32,36 @@ class ProfileViewModel(
         viewModelScope.launch {
             isLoading = true
             errorMessage = null
-            try {
-                val resp = repo.me() // Response<ServerEnvelope<UserProfileData>>
-                if (resp.isSuccessful) {
-                    val data = resp.body()?.data
-                    if (data != null) {
-                        profile = data
-                    } else {
-                        errorMessage = resp.body()?.message ?: "Empty profile response"
-                    }
-                } else {
-                    val err = try { resp.errorBody()?.string() } catch (_: Exception) { null }
-                    errorMessage = err ?: resp.message()
+
+            val userResp = repository.getProfile()
+            val addrResp = repository.getAddresses()
+
+            when {
+                userResp is ApiResponse.Success && addrResp is ApiResponse.Success -> {
+                    val user = userResp.data
+                    profile = UserProfileData(
+                        username = user.username,
+                        email = user.email,
+                        phoneNumber = user.phoneNumber,
+                        role = user.role,
+                        addresses = addrResp.data
+                    )
                 }
-            } catch (t: Throwable) {
-                errorMessage = t.message ?: "Unknown error"
-            } finally {
-                isLoading = false
+                userResp is ApiResponse.Error -> {
+                    profile = null
+                    errorMessage = userResp.message ?: "Failed to load profile"
+                }
+                addrResp is ApiResponse.Error -> {
+                    profile = null
+                    errorMessage = addrResp.message ?: "Failed to load addresses"
+                }
+                else -> {
+                    profile = null
+                    errorMessage = "Unknown error"
+                }
             }
+
+            isLoading = false
         }
     }
 }

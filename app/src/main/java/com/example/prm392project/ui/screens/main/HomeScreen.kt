@@ -1,44 +1,24 @@
 package com.example.prm392project.ui.screens.main
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.ShoppingCart
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LocalTextStyle
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -48,225 +28,280 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.zIndex
+import androidx.lifecycle.viewmodel.compose.viewModel
 
 private val DarkHeaderStart = Color(0xFF1C1C1C)
 private val DarkHeaderEnd = Color(0xFF0F0F0F)
 private val Accent = Color(0xFFD0875B)
-private val SoftGray = Color(0xFFF3F3F3)
 private val CardGray = Color(0xFFECECEC)
+private val ScreenBg = Color(0xFFF6F6F8)
+private val BadgeRed = Color(0xFFFF6B6B)
 
-data class DemoProduct(
-    val id: String,
-    val title: String,
-    val price: String
-)
+data class DemoProduct(val id: String, val title: String, val price: String)
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(modifier: Modifier = Modifier) {
-    val products = remember {
-        List(6) { i -> DemoProduct("$i", "Product ${i + 1}", "$${(20 + i * 5)}") }
+@Preview
+fun HomeScreen(
+    modifier: Modifier = Modifier,
+    viewModel: HomeViewModel = viewModel(),
+    onProfileClick: () -> Unit = {},
+    onNotificationsClick: () -> Unit = {}
+) {
+    val fullName by viewModel.fullName.collectAsState()
+    val categories by viewModel.categories.collectAsState(initial = listOf("All"))
+    LaunchedEffect(Unit) {
+        viewModel.fetchUserData()
+        viewModel.fetchCategories()
     }
 
+    val isLoading = fullName == "Loading..."
+    val isError = fullName.startsWith("Error")
+
+    val products = remember { List(6) { i -> DemoProduct("$i", "Product ${i + 1}", "$${20 + i * 5}") } }
+    var search by remember { mutableStateOf("") }
+    var selectedCat by remember { mutableStateOf(0) }
+
+    val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val extraTopGap = 0.dp
+    val headerTopGap = statusBarTop + extraTopGap
+
+    // tuned sizes: increase headerHeight so search sits above the overlap
+    val headerHeight = 220.dp
+    val promoHeight = 140.dp
+    val halfPromo = promoHeight / 2
+    val headerInnerHeight = headerHeight - halfPromo // reserved area above the promo overlap
+
     Scaffold(
-        bottomBar = { HomeBottomBar() },
+        bottomBar = { HomeBottomBar(onProfileClick) },
+        containerColor = ScreenBg,
         modifier = modifier.fillMaxSize()
     ) { innerPadding ->
-        Box(modifier = Modifier.fillMaxSize()) {
-            // Top dark header
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+        ) {
+            // Header background (full headerHeight, promo will overlap its bottom)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(240.dp)
-                    .background(
-                        brush = Brush.verticalGradient(
-                            colors = listOf(DarkHeaderStart, DarkHeaderEnd)
-                        )
-                    )
+                    .height(headerHeight)
+                    .background(brush = Brush.verticalGradient(listOf(
+                        DarkHeaderStart,
+                        DarkHeaderEnd
+                    )))
             ) {
-                Column(modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 20.dp, vertical = 22.dp)
+                // top area reserved so promo doesn't cover the search
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(headerInnerHeight) // content lives above the overlapping promo
                 ) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    // two small lines simulating title/subtitle
-                    Box(modifier = Modifier
-                        .width(120.dp)
-                        .height(8.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color(0xFF3D3D3D)))
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Box(modifier = Modifier
-                        .width(200.dp)
-                        .height(8.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color(0xFF3D3D3D)))
-                    Spacer(modifier = Modifier.height(20.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        // Search box
+                    // greeting & name at top-left
+                    Column(
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .padding(top = 20.dp, start = 16.dp, end = 16.dp)
+                    ) {
+                        if (isLoading) {
+                            CircularProgressIndicator(color = Color.White)
+                        } else {
+                            Text(
+                                text = "Xin chào",
+                                color = Color.White,
+                                fontSize = 24.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+
+                        Spacer(Modifier.height(8.dp))
+
+                        Text(
+                            text = if (fullName.isBlank()) "–" else fullName,
+                            color = Color.White,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+
+                    // search row placed at the bottom of the reserved inner area
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(start = 16.dp, end = 16.dp, bottom = 12.dp)
+                            .fillMaxWidth()
+                    ) {
                         OutlinedTextField(
-                            value = "",
-                            onValueChange = {},
-                            placeholder = { Text("Search", color = Color.LightGray) },
-                            leadingIcon = { Icon(Icons.Default.Home, contentDescription = null, tint = Color.LightGray) },
+                            value = search,
+                            onValueChange = { search = it },
+                            placeholder = { Text("Search", color = Color.LightGray, fontSize = 15.sp) },
+                            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color.LightGray) },
                             modifier = Modifier
                                 .weight(1f)
                                 .height(48.dp)
                                 .clip(RoundedCornerShape(12.dp)),
-                            colors = TextFieldDefaults.outlinedTextFieldColors(
-                                containerColor = Color(0xFF222222),
-                                unfocusedBorderColor = Color.Transparent,
-                                focusedBorderColor = Color.Transparent
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = Color(0xFF222222),
+                                unfocusedContainerColor = Color(0xFF222222),
+                                disabledContainerColor = Color(0xFF222222),
+                                focusedIndicatorColor = Color.Transparent,
+                                unfocusedIndicatorColor = Color.Transparent,
+                                disabledIndicatorColor = Color.Transparent,
+                                cursorColor = Color.White
                             ),
-                            textStyle = LocalTextStyle.current.copy(color = Color.White)
+                            textStyle = LocalTextStyle.current.copy(color = Color.White),
+                            singleLine = true
                         )
                         Spacer(modifier = Modifier.width(12.dp))
-                        // Filter button
                         IconButton(
-                            onClick = {},
+                            onClick = { /* filter */ },
                             modifier = Modifier
                                 .size(48.dp)
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(Accent)
                         ) {
-                            Icon(
-                                Icons.Default.List,
-                                contentDescription = null,
-                                tint = Color.White
-                            )
+                            Icon(Icons.Default.List, contentDescription = "Filter", tint = Color.White)
                         }
+                    }
+                }
+
+                // notification icon stays at top right of header background
+                IconButton(
+                    onClick = onNotificationsClick,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 22.dp, end = 12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Notifications,
+                        contentDescription = "Notifications",
+                        tint = Color.Gray
+                    )
+                }
+            }
+
+            // Content: start exactly below header, then push chips down so they are below promo bottom
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(top = headerTopGap + headerHeight) // start right after header bottom
+                    .background(ScreenBg)
+            ) {
+
+                Spacer(Modifier.height(halfPromo + 8.dp)) // half promo (intrusion) + small gap
+
+                CategoryChipsRow(
+                    categories = categories,
+                    selectedIndex = selectedCat,
+                    onSelect = { selectedCat = it },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                )
+
+                Spacer(Modifier.height(12.dp))
+
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(2),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 8.dp),
+                    contentPadding = PaddingValues(bottom = 96.dp)
+                ) {
+                    items(products.size) { idx ->
+                        val p = products[idx]
+                        ProductCard(
+                            title = p.title,
+                            price = p.price,
+                            modifier = Modifier.padding(8.dp)
+                        )
                     }
                 }
             }
 
-            // Content column with overlap
-            Column(
+            // Promo drawn last so it sits above both header and content; positioned so half overlaps
+            FeaturePromoCard(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(top = 200.dp)
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
-                    .padding(innerPadding)
-            ) {
-                // Overlapping promo card
-                Card(
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = CardGray),
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .height(promoHeight)
+                    .align(Alignment.TopCenter)
+                    .offset(y = headerTopGap + headerHeight - halfPromo)
+                    .zIndex(1f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun FeaturePromoCard(modifier: Modifier = Modifier) {
+    Card(
+        modifier = modifier
+            .height(140.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(8.dp)
+    ) {
+        Row(Modifier.fillMaxSize().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f)) {
+                // small promo badge
+                Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(110.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(BadgeRed)
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
                 ) {
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        // small pill tag
-                        Box(
-                            modifier = Modifier
-                                .padding(12.dp)
-                                .size(width = 70.dp, height = 26.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(Color(0xFFEB6B6B))
-                        )
-                        Column(modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 12.dp, vertical = 18.dp)
-                        ) {
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Box(modifier = Modifier
-                                .width(180.dp)
-                                .height(12.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(Color.White))
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Box(modifier = Modifier
-                                .fillMaxWidth()
-                                .height(12.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(Color(0xFF2A2A2A)))
-                        }
-                    }
+                    Text(text = "Promo", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(Modifier.height(8.dp))
 
-                // Chips row
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.fillMaxWidth()
+                Text(
+                    text = "Buy one get\none FREE",
+                    color = Color(0xFF222222),
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 2
+                )
+
+                Spacer(Modifier.height(6.dp))
+
+                Text(
+                    text = "Limited time offer",
+                    color = Color(0xFF7A7A7A),
+                    fontSize = 12.sp
+                )
+            }
+
+            Spacer(Modifier.width(12.dp))
+
+            // image placeholder and heart icon to emulate reference look
+            Box(
+                modifier = Modifier
+                    .size(width = 110.dp, height = 92.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Brush.linearGradient(listOf(Color(0xFFEFEFEF), Color(0xFFF7F7F7))))
+            ) {
+                // floating heart badge
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFFFEDE6))
+                        .align(Alignment.TopEnd)
+                        .padding(4.dp)
                 ) {
-                    items(listOf("All", "New", "Popular", "Sale")) { text ->
-                        Box(
-                            modifier = Modifier
-                                .height(36.dp)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(if (text == "All") Accent else SoftGray)
-                                .padding(horizontal = 14.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(text, color = if (text == "All") Color.White else Color.Black, fontSize = 14.sp)
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Products grid (2 columns)
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(2),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.fillMaxHeight()
-                ) {
-                    items(products) { p ->
-                        Card(
-                            shape = RoundedCornerShape(12.dp),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(240.dp)
-                        ) {
-                            Column(modifier = Modifier.fillMaxSize()) {
-                                Box(modifier = Modifier
-                                    .height(120.dp)
-                                    .fillMaxWidth()
-                                    .background(SoftGray)
-                                ) {
-                                    // star badge
-                                    Box(
-                                        modifier = Modifier
-                                            .align(Alignment.TopEnd)
-                                            .padding(8.dp)
-                                            .size(28.dp)
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(Color(0xFFBDBDBD)),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text("★", fontSize = 14.sp, color = Color.Yellow)
-                                    }
-                                }
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Column(modifier = Modifier.padding(horizontal = 10.dp)) {
-                                    Text(p.title, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                    Spacer(modifier = Modifier.height(6.dp))
-                                    Text("Short description", color = Color.Gray, fontSize = 12.sp)
-                                    Spacer(modifier = Modifier.height(10.dp))
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Text(p.price, fontWeight = FontWeight.Bold)
-                                        Box(
-                                            modifier = Modifier
-                                                .size(34.dp)
-                                                .clip(RoundedCornerShape(8.dp))
-                                                .background(Accent),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Text("+", color = Color.White, fontWeight = FontWeight.Bold)
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    Icon(
+                        imageVector = Icons.Default.Favorite,
+                        contentDescription = null,
+                        tint = Accent,
+                        modifier = Modifier.align(Alignment.Center)
+                    )
                 }
             }
         }
@@ -274,7 +309,81 @@ fun HomeScreen(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun HomeBottomBar() {
+private fun CategoryChipsRow(
+    categories: List<String>,
+    selectedIndex: Int,
+    onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier.padding(top = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        categories.forEachIndexed { i, label ->
+            val selected = i == selectedIndex
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(if (selected) Accent else Color.White)
+                    .borderIf(!selected, 1.dp, Color(0xFFE0E0E0), RoundedCornerShape(12.dp))
+                    .clickable { onSelect(i) }
+                    .padding(horizontal = 14.dp, vertical = 8.dp)
+            ) {
+                Text(
+                    text = label,
+                    color = if (selected) Color.White else Color(0xFF323232),
+                    fontSize = 12.sp,
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProductCard(title: String, price: String, modifier: Modifier = Modifier) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        modifier = modifier.height(200.dp),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(2.dp)
+    ) {
+        Box(Modifier.fillMaxSize()) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(120.dp)
+                    .background(CardGray)
+            )
+            Box(
+                Modifier
+                    .padding(8.dp)
+                    .size(20.dp)
+                    .clip(CircleShape)
+                    .background(Accent)
+                    .align(Alignment.TopEnd)
+            )
+            Column(Modifier.align(Alignment.BottomStart).padding(12.dp)) {
+                Text(title, color = Color.Black, fontSize = 14.sp, maxLines = 1)
+                Spacer(Modifier.height(6.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(price, color = Accent, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.weight(1f))
+                    Box(
+                        Modifier
+                            .size(24.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Accent)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomeBottomBar(onProfileClick: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -293,23 +402,19 @@ private fun HomeBottomBar() {
             Row(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 22.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                    .padding(horizontal = 12.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = {}) { Icon(Icons.Default.Home, contentDescription = null, tint = Accent) }
                 IconButton(onClick = {}) { Icon(Icons.Default.Favorite, contentDescription = null, tint = Color.Gray) }
                 IconButton(onClick = {}) { Icon(Icons.Default.ShoppingCart, contentDescription = null, tint = Color.Gray) }
-                IconButton(onClick = {}) { Icon(Icons.Default.Notifications, contentDescription = null, tint = Color.Gray) }
+                IconButton(onClick = onProfileClick) { Icon(Icons.Default.Person, contentDescription = "Profile", tint = Color.Gray) }
             }
         }
     }
 }
 
-@Preview(showBackground = true)
-@Composable
-private fun HomeScreenPreview() {
-    MaterialTheme {
-        HomeScreen()
-    }
-}
+// small helper to avoid an extra dependency
+private fun Modifier.borderIf(condition: Boolean, width: Dp, color: Color, shape: RoundedCornerShape) =
+    if (condition) this.then(Modifier.border(width, color, shape)) else this

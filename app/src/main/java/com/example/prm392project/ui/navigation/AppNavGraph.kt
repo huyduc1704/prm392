@@ -6,13 +6,15 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-import com.example.prm392project.data.remote.AuthStore
+import com.example.prm392project.data.local.TokenStore
 import com.example.prm392project.data.remote.api.AddressRequest
 import com.example.prm392project.data.remote.api.LoginRequest
 import com.example.prm392project.data.remote.api.RegisterRequest
+import com.example.prm392project.data.remote.api.authApiService
 import com.example.prm392project.data.repository.AuthRepository
 import com.example.prm392project.ui.screens.auth.AuthViewModel
 import com.example.prm392project.ui.screens.auth.AuthViewModelFactory
@@ -34,136 +36,96 @@ const val ROUTE_NOT_AUTH = "not_authorized"
 @Composable
 fun AppNavGraph(
     navController: NavHostController,
-    authStore: AuthStore,
-    startDestination: String = ROUTE_HOME
+    startDestination: String = ROUTE_LOGIN
 ) {
-    // compute role-based UI flag once per composition
-    val role = try { authStore.getRole() ?: "" } catch (_: Exception) { "" }
-    val showManage = role.equals("ADMIN", ignoreCase = true) || role.equals("MODERATOR", ignoreCase = true)
-
     NavHost(navController = navController, startDestination = startDestination) {
         composable(ROUTE_HOME) {
             HomeScreen(
-                onProfileClick = {
-                    // decide at click time using current authStore state
-                    if (authStore.isAuthorized()) {
-                        navController.navigate(ROUTE_PROFILE)
-                    } else {
-                        navController.navigate(ROUTE_LOGIN)
-                    }
-                },
-                showManage = showManage,
-                onManageClick = {
-                    // admin/moderator -> management hub
-                    navController.navigate(ROUTE_MANAGEMENT_HUB)
-                },
-                onCartClick = {
-                    // regular users -> cart (no cart route defined here, implement if needed)
-                }
+                onProfileClick = { navController.navigate(ROUTE_PROFILE) },
+                onNotificationsClick = { }
             )
         }
 
         composable(ROUTE_LOGIN) {
-            val repo = AuthRepository()
-            val factory = AuthViewModelFactory(repo, authStore)
+            val factory = AuthViewModelFactory(AuthRepository(authApiService))
             val vm: AuthViewModel = viewModel(factory = factory)
-            val authResp by vm.authState.collectAsState(initial = null)
+            val loginResponse by vm.loginState.collectAsState()
 
-            LaunchedEffect(authResp) {
-                val resp = authResp
-                if (resp?.isSuccessful == true) {
-                    val token = resp.body()?.data?.accessToken
-                    val username = resp.body()?.data?.username ?: ""
+            LaunchedEffect(loginResponse) {
+                if (loginResponse?.isSuccessful == true) {
+                    val token = loginResponse?.body()?.data?.accessToken
                     if (!token.isNullOrBlank()) {
-                        // Persist token before navigation
-                        try {
-                            authStore.saveAuth(token, username)
-                        } catch (_: Exception) { /* ignore */ }
-
-                        // Navigate back to Home (clear login from back stack)
+                        TokenStore.token = token
                         navController.navigate(ROUTE_HOME) {
-                            popUpTo(ROUTE_LOGIN) { inclusive = true }
+                            popUpTo(navController.graph.findStartDestination().id) { inclusive = true }
+                            launchSingleTop = true
                         }
+                        vm.clearLoginState()
                     }
                 }
             }
 
             LoginScreen(
-                onLoginClick = { username, password ->
+                onLoginClick = { username: String, password: String ->
                     vm.login(LoginRequest(username = username, password = password))
                 },
-                onRegisterClick = { navController.navigate(ROUTE_REGISTER) }
+                onRegisterClick = { navController.navigate(ROUTE_REGISTER) { launchSingleTop = true } }
             )
         }
 
         composable(ROUTE_REGISTER) {
-            val repo = AuthRepository()
-            val factory = AuthViewModelFactory(repo, authStore)
+            val factory = AuthViewModelFactory(AuthRepository(authApiService))
             val vm: AuthViewModel = viewModel(factory = factory)
-            val authResp by vm.authState.collectAsState(initial = null)
+            val registerResponse by vm.registerState.collectAsState()
 
-            LaunchedEffect(authResp) {
-                val resp = authResp
-                if (resp?.isSuccessful == true) {
-                    // After successful register, route back to Login so user can sign in.
+            LaunchedEffect(registerResponse) {
+                if (registerResponse?.isSuccessful == true) {
                     navController.navigate(ROUTE_LOGIN) {
-                        popUpTo(ROUTE_REGISTER) { inclusive = true }
+                        popUpTo(navController.graph.findStartDestination().id) { inclusive = false }
+                        launchSingleTop = true
                     }
+                    vm.clearRegisterState()
                 }
             }
 
             RegisterScreen(
                 onRegisterClick = { username, email, password, phone, fullName, city, ward, street ->
-                    val addr = AddressRequest(fullName = fullName, phoneNumber = phone, city = city, ward = ward, street = street)
-                    val req = RegisterRequest(
-                        username = username,
-                        email = email,
-                        password = password,
+                    val address = AddressRequest(
+                        fullName = fullName,
                         phoneNumber = phone,
-                        addresses = listOf(addr)
+                        city = city,
+                        ward = ward,
+                        street = street
                     )
-                    vm.register(req)
+                    vm.register(
+                        RegisterRequest(
+                            username = username,
+                            email = email,
+                            password = password,
+                            phoneNumber = phone,
+                            role = "CUSTOMER",
+                            addresses = listOf(address)
+                        )
+                    )
                 },
-                onBackClick = { navController.popBackStack() }
+                onBackClick = { navController.navigateUp() }
             )
         }
 
-        // Profile route: if authorized show ProfileScreen, otherwise redirect to login
         composable(ROUTE_PROFILE) {
-            // Show ProfileScreen regardless; the screen / VM will detect unauthenticated and call back.
             ProfileScreen(
                 onLogout = {
-                    try { authStore.saveAuth("", "") } catch (_: Exception) { }
-                    navController.navigate(ROUTE_HOME) {
-                        popUpTo(ROUTE_PROFILE) { inclusive = true }
-                    }
-                },
-                onUnauthenticated = {
-                    try { authStore.saveAuth("", "") } catch (_: Exception) { }
+                    TokenStore.token = null
                     navController.navigate(ROUTE_LOGIN) {
-                        popUpTo(ROUTE_PROFILE) { inclusive = true }
+                        popUpTo(navController.graph.findStartDestination().id) { inclusive = true }
+                        launchSingleTop = true
                     }
                 }
             )
         }
 
-        composable(ROUTE_CATEGORY_MANAGEMENT) {
-            if (authStore.isAuthorized()) {
-                CategoryManagementScreen()
-            } else {
-                navController.navigate(ROUTE_NOT_AUTH) {
-                    popUpTo(ROUTE_LOGIN) { inclusive = false }
-                }
-            }
-        }
-
-        // placeholder for management hub route (implement screen if not present)
-        composable(ROUTE_MANAGEMENT_HUB) {
-            Text("Management hub (implement ManagementHubScreen composable)")
-        }
-
-        composable(ROUTE_NOT_AUTH) {
-            Text("You are not authorized to access this screen.")
-        }
+        composable(ROUTE_CATEGORY_MANAGEMENT) { CategoryManagementScreen() }
+        composable(ROUTE_MANAGEMENT_HUB) { Text("Management hub (implement)") }
+        composable(ROUTE_NOT_AUTH) { Text("You are not authorized to access this screen.") }
     }
 }

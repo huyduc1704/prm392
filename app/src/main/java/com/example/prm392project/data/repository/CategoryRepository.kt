@@ -6,31 +6,38 @@ import com.example.prm392project.data.remote.api.CategoryRequest
 import com.example.prm392project.data.remote.api.CategoryResponse
 import com.example.prm392project.data.remote.api.PaginatedResponse
 import com.example.prm392project.data.remote.api.categoryApiService
-import com.example.prm392project.data.remote.toApiResponse
+import com.example.prm392project.data.remote.toDataApiResponse
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-class CategoryRepository(private val api: CategoryApiService = categoryApiService) {
+class CategoryRepository(
+    private val apiProvider: () -> CategoryApiService = { categoryApiService }
+) {
+
+    private val api: CategoryApiService by lazy { apiProvider() }
 
     suspend fun list(page: Int = 0, size: Int = 20): ApiResponse<PaginatedResponse<CategoryResponse>> =
         withContext(Dispatchers.IO) {
             try {
-                val resp = api.list(page, size) // now Response<ServerEnvelope<List<CategoryResponse>>>
+                val resp = api.list(page, size)
                 if (resp.isSuccessful) {
-                    val env = resp.body()
-                    val list = env?.data
-                    if (list != null) {
-                        // map server array into PaginatedResponse so ViewModel keeps working
-                        val paginated = PaginatedResponse(
-                            content = list,
-                            totalElements = list.size,
-                            totalPages = 1,
-                            number = page,
-                            size = size
-                        )
-                        ApiResponse.Success(paginated)
-                    } else {
-                        ApiResponse.Error(env?.message ?: "Empty response body", resp.code())
+                    val body = resp.body()
+                    when (body) {
+                        is ApiResponse.Success -> {
+                            val list: List<CategoryResponse> = body.data ?: emptyList()
+                            val paginated = PaginatedResponse(
+                                content = list,
+                                totalElements = list.size,
+                                totalPages = 1,
+                                number = page,
+                                size = size
+                            )
+                            ApiResponse.Success(paginated)
+                        }
+                        is ApiResponse.Error -> {
+                            ApiResponse.Error(body.message ?: "Error from API", body.code ?: -1)
+                        }
+                        else -> ApiResponse.Error("Empty or unexpected response")
                     }
                 } else {
                     val err = try { resp.errorBody()?.string() } catch (e: Exception) { null }
@@ -41,15 +48,21 @@ class CategoryRepository(private val api: CategoryApiService = categoryApiServic
             }
         }
 
-    // other methods remain unchanged...
     suspend fun get(id: String): ApiResponse<CategoryResponse> =
         withContext(Dispatchers.IO) {
             try {
                 val resp = api.get(id)
                 if (resp.isSuccessful) {
-                    val env = resp.body()
-                    if (env?.data != null) ApiResponse.Success(env.data)
-                    else ApiResponse.Error(env?.message ?: "Empty response body", resp.code())
+                    val body = resp.body()
+                    when (body) {
+                        is ApiResponse.Success -> {
+                            val data = body.data
+                            if (data != null) ApiResponse.Success(data)
+                            else ApiResponse.Error("Empty response body", resp.code())
+                        }
+                        is ApiResponse.Error -> ApiResponse.Error(body.message ?: "Error from API", body.code ?: resp.code())
+                        else -> ApiResponse.Error("Empty response body", resp.code())
+                    }
                 } else {
                     val err = try { resp.errorBody()?.string() } catch (e: Exception) { null }
                     ApiResponse.Error(err ?: resp.message(), resp.code())
@@ -64,9 +77,16 @@ class CategoryRepository(private val api: CategoryApiService = categoryApiServic
             try {
                 val resp = api.create(request)
                 if (resp.isSuccessful) {
-                    val env = resp.body()
-                    if (env?.data != null) ApiResponse.Success(env.data)
-                    else ApiResponse.Error(env?.message ?: "Empty response body", resp.code())
+                    val body = resp.body()
+                    when (body) {
+                        is ApiResponse.Success -> {
+                            val data = body.data
+                            if (data != null) ApiResponse.Success(data)
+                            else ApiResponse.Error("Empty response body", resp.code())
+                        }
+                        is ApiResponse.Error -> ApiResponse.Error(body.message ?: "Error from API", body.code ?: resp.code())
+                        else -> ApiResponse.Error("Empty response body", resp.code())
+                    }
                 } else {
                     val err = try { resp.errorBody()?.string() } catch (e: Exception) { null }
                     ApiResponse.Error(err ?: resp.message(), resp.code())
@@ -81,9 +101,16 @@ class CategoryRepository(private val api: CategoryApiService = categoryApiServic
             try {
                 val resp = api.update(id, request)
                 if (resp.isSuccessful) {
-                    val env = resp.body()
-                    if (env?.data != null) ApiResponse.Success(env.data)
-                    else ApiResponse.Error(env?.message ?: "Empty response body", resp.code())
+                    val body = resp.body()
+                    when (body) {
+                        is ApiResponse.Success -> {
+                            val data = body.data
+                            if (data != null) ApiResponse.Success(data)
+                            else ApiResponse.Error("Empty response body", resp.code())
+                        }
+                        is ApiResponse.Error -> ApiResponse.Error(body.message ?: "Error from API", body.code ?: resp.code())
+                        else -> ApiResponse.Error("Empty response body", resp.code())
+                    }
                 } else {
                     val err = try { resp.errorBody()?.string() } catch (e: Exception) { null }
                     ApiResponse.Error(err ?: resp.message(), resp.code())
@@ -98,7 +125,12 @@ class CategoryRepository(private val api: CategoryApiService = categoryApiServic
             try {
                 val resp = api.delete(id)
                 if (resp.isSuccessful) {
-                    ApiResponse.Success(Unit)
+                    val body = resp.body()
+                    when (body) {
+                        is ApiResponse.Success -> ApiResponse.Success(body.data ?: Unit)
+                        is ApiResponse.Error -> ApiResponse.Error(body.message ?: "Error from API", body.code ?: resp.code())
+                        else -> ApiResponse.Success(Unit)
+                    }
                 } else {
                     val err = try { resp.errorBody()?.string() } catch (e: Exception) { null }
                     ApiResponse.Error(err ?: resp.message(), resp.code())

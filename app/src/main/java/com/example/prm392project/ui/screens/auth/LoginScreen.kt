@@ -1,4 +1,4 @@
-package com.example.prm392project.ui.screens
+package com.example.prm392project.ui.screens.auth
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*

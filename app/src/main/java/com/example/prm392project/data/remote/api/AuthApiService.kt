@@ -1,6 +1,10 @@
 package com.example.prm392project.data.remote.api
 
+import com.example.prm392project.BuildConfig
 import com.example.prm392project.data.model.User
+import com.google.gson.annotations.SerializedName
+import okhttp3.OkHttpClient
+import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Response
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
@@ -29,21 +33,40 @@ data class LoginRequest(
     val password: String
 )
 
-data class AuthResponse(
-    val user: User,
-    val token: String
+data class ApiEnvelope<T>(
+    val code: Int,
+    val success: Boolean,
+    val message: String?,
+    val data: T?
 )
-val retrofit = Retrofit.Builder()
-    .baseUrl("http://34.63.203.101:8080/") // Replace with your API base URL
-    .addConverterFactory(GsonConverterFactory.create())
+
+data class LoginData(
+    @SerializedName("accessToken") val accessToken: String?,
+    val username: String?,
+    val email: String?,
+    val role: String?
+)
+
+private val logging = HttpLoggingInterceptor().apply {
+    level = HttpLoggingInterceptor.Level.BODY
+}
+
+private val httpClient: OkHttpClient = OkHttpClient.Builder()
+    .addInterceptor(logging)
     .build()
 
-val authApiService = retrofit.create(AuthApiService::class.java)
+val retrofit = Retrofit.Builder()
+    .baseUrl(BuildConfig.PROD_BASE_URL)
+    .addConverterFactory(GsonConverterFactory.create())
+    .client(httpClient)
+    .build()
+
+val authApiService: AuthApiService = retrofit.create(AuthApiService::class.java)
 
 interface AuthApiService {
     @POST("api/v1/auth/register")
-    suspend fun register(@Body request: RegisterRequest): Response<AuthResponse>
+    suspend fun register(@Body request: RegisterRequest): Response<ApiEnvelope<Any>>
 
     @POST("api/v1/auth/login")
-    suspend fun login(@Body request: LoginRequest): Response<AuthResponse>
+    suspend fun login(@Body request: LoginRequest): Response<ApiEnvelope<LoginData>>
 }

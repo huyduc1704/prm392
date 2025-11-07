@@ -8,7 +8,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 
 object RetrofitInstance {
-    private const val TIMEOUT_SEC = 30L
+    private const val TIMEOUT_SEC = 60L
 
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
         level = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BODY
@@ -24,6 +24,8 @@ object RetrofitInstance {
             .connectTimeout(TIMEOUT_SEC, TimeUnit.SECONDS)
             .readTimeout(TIMEOUT_SEC, TimeUnit.SECONDS)
             .writeTimeout(TIMEOUT_SEC, TimeUnit.SECONDS)
+            .callTimeout(TIMEOUT_SEC, TimeUnit.SECONDS)
+            .retryOnConnectionFailure(true)
 
         authStore?.let { store ->
             builder.addInterceptor { chain ->

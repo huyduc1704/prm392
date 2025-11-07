@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <domain-config cleartextTrafficPermitted="true">
-        <domain>20.191.146.183</domain>
+    <domain-config>
+        <domain includeSubdomains="true">34.63.203.101</domain>
     </domain-config>
+
+    <!-- Cho phép tất cả HTTP (dev only) -->
+    <base-config cleartextTrafficPermitted="true" />
 </network-security-config>
