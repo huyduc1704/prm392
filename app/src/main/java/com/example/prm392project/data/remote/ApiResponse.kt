@@ -28,9 +28,11 @@ suspend fun <T> Response<ApiEnvelope<T>>.toDataApiResponse(): ApiResponse<T> {
     return try {
         if (isSuccessful) {
             val env = body()
-            val data = env?.data
-            if (data != null) ApiResponse.Success(data)
-            else ApiResponse.Error(env?.message ?: "Empty data", code())
+            if (env != null && env.data != null) {
+                ApiResponse.Success(env.data)
+            } else {
+                ApiResponse.Error(env?.message ?: "Empty data", code())
+            }
         } else {
             val errorText = try { errorBody()?.string() } catch (_: Exception) { null }
             ApiResponse.Error(errorText ?: message(), code())

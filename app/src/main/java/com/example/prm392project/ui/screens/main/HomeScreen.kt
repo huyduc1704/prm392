@@ -3,10 +3,12 @@ package com.example.prm392project.ui.screens.main
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -33,6 +35,8 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.prm392project.data.remote.api.CategoryResponse
+import com.example.prm392project.data.remote.api.ProductResponse
 
 private val DarkHeaderStart = Color(0xFF1C1C1C)
 private val DarkHeaderEnd = Color(0xFF0F0F0F)
@@ -41,27 +45,29 @@ private val CardGray = Color(0xFFECECEC)
 private val ScreenBg = Color(0xFFF6F6F8)
 private val BadgeRed = Color(0xFFFF6B6B)
 
-data class DemoProduct(val id: String, val title: String, val price: String)
-
 @Composable
 @Preview
 fun HomeScreen(
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = viewModel(),
     onProfileClick: () -> Unit = {},
-    onNotificationsClick: () -> Unit = {}
+    onNotificationsClick: () -> Unit = {},
+    onProductClick: (String) -> Unit = {},
+    onCartClick: () -> Unit = {}
 ) {
     val fullName by viewModel.fullName.collectAsState()
-    val categories by viewModel.categories.collectAsState(initial = listOf("All"))
+    val categories by viewModel.categories.collectAsState()
+    val products by viewModel.products.collectAsState()
+
     LaunchedEffect(Unit) {
         viewModel.fetchUserData()
         viewModel.fetchCategories()
+        viewModel.fetchActiveProducts()
     }
 
     val isLoading = fullName == "Loading..."
     val isError = fullName.startsWith("Error")
 
-    val products = remember { List(6) { i -> DemoProduct("$i", "Product ${i + 1}", "$${20 + i * 5}") } }
     var search by remember { mutableStateOf("") }
     var selectedCat by remember { mutableStateOf(0) }
 
@@ -76,7 +82,7 @@ fun HomeScreen(
     val headerInnerHeight = headerHeight - halfPromo // reserved area above the promo overlap
 
     Scaffold(
-        bottomBar = { HomeBottomBar(onProfileClick) },
+        bottomBar = { HomeBottomBar(onProfileClick, onCartClick) },
         containerColor = ScreenBg,
         modifier = modifier.fillMaxSize()
     ) { innerPadding ->
@@ -138,7 +144,10 @@ fun HomeScreen(
                     ) {
                         OutlinedTextField(
                             value = search,
-                            onValueChange = { search = it },
+                            onValueChange = {
+                                search = it
+                                viewModel.searchProducts(it)
+                            },
                             placeholder = { Text("Search", color = Color.LightGray, fontSize = 15.sp) },
                             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color.LightGray) },
                             modifier = Modifier
@@ -195,10 +204,20 @@ fun HomeScreen(
 
                 Spacer(Modifier.height(halfPromo + 8.dp)) // half promo (intrusion) + small gap
 
+                val allCategory = CategoryResponse("", "All", null, true, null, null)
+                val categoriesWithAll = listOf(allCategory) + categories
+
                 CategoryChipsRow(
-                    categories = categories,
+                    categories = categoriesWithAll,
                     selectedIndex = selectedCat,
-                    onSelect = { selectedCat = it },
+                    onSelect = { index ->
+                        selectedCat = index
+                        if (index == 0) {
+                            viewModel.fetchActiveProducts()
+                        } else {
+                            viewModel.fetchProductsByCategory(categoriesWithAll[index].id)
+                        }
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp)
@@ -216,9 +235,10 @@ fun HomeScreen(
                     items(products.size) { idx ->
                         val p = products[idx]
                         ProductCard(
-                            title = p.title,
-                            price = p.price,
-                            modifier = Modifier.padding(8.dp)
+                            product = p,
+                            modifier = Modifier
+                                .padding(8.dp)
+                                .clickable { onProductClick(p.id) }
                         )
                     }
                 }
@@ -310,17 +330,19 @@ private fun FeaturePromoCard(modifier: Modifier = Modifier) {
 
 @Composable
 private fun CategoryChipsRow(
-    categories: List<String>,
+    categories: List<CategoryResponse>,
     selectedIndex: Int,
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Row(
-        modifier = modifier.padding(top = 8.dp),
+        modifier = modifier
+            .padding(top = 8.dp)
+            .horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        categories.forEachIndexed { i, label ->
+        categories.forEachIndexed { i, category ->
             val selected = i == selectedIndex
             Box(
                 modifier = Modifier
@@ -331,7 +353,7 @@ private fun CategoryChipsRow(
                     .padding(horizontal = 14.dp, vertical = 8.dp)
             ) {
                 Text(
-                    text = label,
+                    text = category.name,
                     color = if (selected) Color.White else Color(0xFF323232),
                     fontSize = 12.sp,
                     fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium
@@ -342,7 +364,7 @@ private fun CategoryChipsRow(
 }
 
 @Composable
-private fun ProductCard(title: String, price: String, modifier: Modifier = Modifier) {
+private fun ProductCard(product: ProductResponse, modifier: Modifier = Modifier) {
     Card(
         colors = CardDefaults.cardColors(containerColor = Color.White),
         modifier = modifier.height(200.dp),
@@ -365,10 +387,26 @@ private fun ProductCard(title: String, price: String, modifier: Modifier = Modif
                     .align(Alignment.TopEnd)
             )
             Column(Modifier.align(Alignment.BottomStart).padding(12.dp)) {
-                Text(title, color = Color.Black, fontSize = 14.sp, maxLines = 1)
+                Text(product.name, color = Color.Black, fontSize = 14.sp, maxLines = 1)
                 Spacer(Modifier.height(6.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(price, color = Accent, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    val firstVariant = product.variants.firstOrNull()
+                    if (firstVariant != null) {
+                        Text(
+                            text = "${firstVariant.price} VND",
+                            color = Accent,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    } else {
+                        Text(
+                            text = "N/A",
+                            color = Color.Gray,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+
                     Spacer(Modifier.weight(1f))
                     Box(
                         Modifier
@@ -383,7 +421,7 @@ private fun ProductCard(title: String, price: String, modifier: Modifier = Modif
 }
 
 @Composable
-private fun HomeBottomBar(onProfileClick: () -> Unit) {
+private fun HomeBottomBar(onProfileClick: () -> Unit, onCartClick: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -408,7 +446,7 @@ private fun HomeBottomBar(onProfileClick: () -> Unit) {
             ) {
                 IconButton(onClick = {}) { Icon(Icons.Default.Home, contentDescription = null, tint = Accent) }
                 IconButton(onClick = {}) { Icon(Icons.Default.Favorite, contentDescription = null, tint = Color.Gray) }
-                IconButton(onClick = {}) { Icon(Icons.Default.ShoppingCart, contentDescription = null, tint = Color.Gray) }
+                IconButton(onClick = onCartClick) { Icon(Icons.Default.ShoppingCart, contentDescription = "Cart", tint = Color.Gray) }
                 IconButton(onClick = onProfileClick) { Icon(Icons.Default.Person, contentDescription = "Profile", tint = Color.Gray) }
             }
         }

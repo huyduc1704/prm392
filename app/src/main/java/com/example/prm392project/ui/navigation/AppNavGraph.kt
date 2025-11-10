@@ -20,11 +20,15 @@ import com.example.prm392project.ui.screens.auth.AuthViewModel
 import com.example.prm392project.ui.screens.auth.AuthViewModelFactory
 import com.example.prm392project.ui.screens.auth.LoginScreen
 import com.example.prm392project.ui.screens.auth.RegisterScreen
+import com.example.prm392project.ui.screens.cart.CartScreen
 import com.example.prm392project.ui.screens.category.CategoryManagementScreen
 import com.example.prm392project.ui.screens.main.HomeScreen
+import com.example.prm392project.ui.screens.product.ProductDetailScreen
 import com.example.prm392project.ui.screens.profile.ProfileScreen
 
 const val ROUTE_HOME = "home"
+const val ROUTE_PRODUCT_DETAIL = "product_detail"
+const val ROUTE_CART = "cart"
 const val ROUTE_LOGIN = "login"
 const val ROUTE_REGISTER = "register"
 const val ROUTE_MAIN = "main"
@@ -42,8 +46,22 @@ fun AppNavGraph(
         composable(ROUTE_HOME) {
             HomeScreen(
                 onProfileClick = { navController.navigate(ROUTE_PROFILE) },
-                onNotificationsClick = { }
+                onNotificationsClick = { },
+                onProductClick = { productId ->
+                    navController.navigate("$ROUTE_PRODUCT_DETAIL/$productId")
+                },
+                onCartClick = { navController.navigate(ROUTE_CART) }
             )
+        }
+
+        composable("$ROUTE_PRODUCT_DETAIL/{productId}") { backStackEntry ->
+            val productId = backStackEntry.arguments?.getString("productId")
+            if (productId != null) {
+                ProductDetailScreen(
+                    productId = productId,
+                    onBackClick = { navController.navigateUp() }
+                )
+            }
         }
 
         composable(ROUTE_LOGIN) {
@@ -127,5 +145,12 @@ fun AppNavGraph(
         composable(ROUTE_CATEGORY_MANAGEMENT) { CategoryManagementScreen() }
         composable(ROUTE_MANAGEMENT_HUB) { Text("Management hub (implement)") }
         composable(ROUTE_NOT_AUTH) { Text("You are not authorized to access this screen.") }
+
+        composable(ROUTE_CART) {
+            CartScreen(
+                onBackClick = { navController.navigateUp() },
+                onCheckoutClick = { /* TODO */ }
+            )
+        }
     }
 }

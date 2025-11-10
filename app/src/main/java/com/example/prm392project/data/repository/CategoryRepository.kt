@@ -22,22 +22,17 @@ class CategoryRepository(
                 val resp = api.list(page, size)
                 if (resp.isSuccessful) {
                     val body = resp.body()
-                    when (body) {
-                        is ApiResponse.Success -> {
-                            val list: List<CategoryResponse> = body.data ?: emptyList()
-                            val paginated = PaginatedResponse(
-                                content = list,
-                                totalElements = list.size,
-                                totalPages = 1,
-                                number = page,
-                                size = size
-                            )
-                            ApiResponse.Success(paginated)
-                        }
-                        is ApiResponse.Error -> {
-                            ApiResponse.Error(body.message ?: "Error from API", body.code ?: -1)
-                        }
-                        else -> ApiResponse.Error("Empty or unexpected response")
+                    if (body != null && body.data != null) {
+                        val paginated = PaginatedResponse(
+                            content = body.data,
+                            totalElements = body.data.size,
+                            totalPages = 1,
+                            number = page,
+                            size = size
+                        )
+                        ApiResponse.Success(paginated)
+                    } else {
+                        ApiResponse.Error(body?.message ?: "Empty or unexpected response")
                     }
                 } else {
                     val err = try { resp.errorBody()?.string() } catch (e: Exception) { null }
@@ -51,22 +46,7 @@ class CategoryRepository(
     suspend fun get(id: String): ApiResponse<CategoryResponse> =
         withContext(Dispatchers.IO) {
             try {
-                val resp = api.get(id)
-                if (resp.isSuccessful) {
-                    val body = resp.body()
-                    when (body) {
-                        is ApiResponse.Success -> {
-                            val data = body.data
-                            if (data != null) ApiResponse.Success(data)
-                            else ApiResponse.Error("Empty response body", resp.code())
-                        }
-                        is ApiResponse.Error -> ApiResponse.Error(body.message ?: "Error from API", body.code ?: resp.code())
-                        else -> ApiResponse.Error("Empty response body", resp.code())
-                    }
-                } else {
-                    val err = try { resp.errorBody()?.string() } catch (e: Exception) { null }
-                    ApiResponse.Error(err ?: resp.message(), resp.code())
-                }
+                api.get(id).toDataApiResponse()
             } catch (t: Throwable) {
                 ApiResponse.Error(t.message ?: "Unknown error")
             }
@@ -75,22 +55,7 @@ class CategoryRepository(
     suspend fun create(request: CategoryRequest): ApiResponse<CategoryResponse> =
         withContext(Dispatchers.IO) {
             try {
-                val resp = api.create(request)
-                if (resp.isSuccessful) {
-                    val body = resp.body()
-                    when (body) {
-                        is ApiResponse.Success -> {
-                            val data = body.data
-                            if (data != null) ApiResponse.Success(data)
-                            else ApiResponse.Error("Empty response body", resp.code())
-                        }
-                        is ApiResponse.Error -> ApiResponse.Error(body.message ?: "Error from API", body.code ?: resp.code())
-                        else -> ApiResponse.Error("Empty response body", resp.code())
-                    }
-                } else {
-                    val err = try { resp.errorBody()?.string() } catch (e: Exception) { null }
-                    ApiResponse.Error(err ?: resp.message(), resp.code())
-                }
+                api.create(request).toDataApiResponse()
             } catch (t: Throwable) {
                 ApiResponse.Error(t.message ?: "Unknown error")
             }
@@ -99,22 +64,7 @@ class CategoryRepository(
     suspend fun update(id: String, request: CategoryRequest): ApiResponse<CategoryResponse> =
         withContext(Dispatchers.IO) {
             try {
-                val resp = api.update(id, request)
-                if (resp.isSuccessful) {
-                    val body = resp.body()
-                    when (body) {
-                        is ApiResponse.Success -> {
-                            val data = body.data
-                            if (data != null) ApiResponse.Success(data)
-                            else ApiResponse.Error("Empty response body", resp.code())
-                        }
-                        is ApiResponse.Error -> ApiResponse.Error(body.message ?: "Error from API", body.code ?: resp.code())
-                        else -> ApiResponse.Error("Empty response body", resp.code())
-                    }
-                } else {
-                    val err = try { resp.errorBody()?.string() } catch (e: Exception) { null }
-                    ApiResponse.Error(err ?: resp.message(), resp.code())
-                }
+                api.update(id, request).toDataApiResponse()
             } catch (t: Throwable) {
                 ApiResponse.Error(t.message ?: "Unknown error")
             }
@@ -123,18 +73,7 @@ class CategoryRepository(
     suspend fun delete(id: String): ApiResponse<Unit> =
         withContext(Dispatchers.IO) {
             try {
-                val resp = api.delete(id)
-                if (resp.isSuccessful) {
-                    val body = resp.body()
-                    when (body) {
-                        is ApiResponse.Success -> ApiResponse.Success(body.data ?: Unit)
-                        is ApiResponse.Error -> ApiResponse.Error(body.message ?: "Error from API", body.code ?: resp.code())
-                        else -> ApiResponse.Success(Unit)
-                    }
-                } else {
-                    val err = try { resp.errorBody()?.string() } catch (e: Exception) { null }
-                    ApiResponse.Error(err ?: resp.message(), resp.code())
-                }
+                api.delete(id).toDataApiResponse()
             } catch (t: Throwable) {
                 ApiResponse.Error(t.message ?: "Unknown error")
             }
