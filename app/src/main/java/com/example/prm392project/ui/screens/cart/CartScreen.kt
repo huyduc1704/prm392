@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.rememberAsyncImagePainter
+import com.example.prm392project.data.model.OrderCartItemUi
 import com.example.prm392project.data.remote.api.CartItemResponse
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -30,7 +31,7 @@ import com.example.prm392project.data.remote.api.CartItemResponse
 fun CartScreen(
     viewModel: CartViewModel = viewModel(),
     onBackClick: () -> Unit,
-    onCheckoutClick: () -> Unit
+    onCheckoutClick: (List<OrderCartItemUi>) -> Unit
 ) {
     val cart by viewModel.cart.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
@@ -90,12 +91,15 @@ fun CartScreen(
                             Text("${cart!!.totalPrice} VND", fontSize = 20.sp, fontWeight = FontWeight.Bold)
                         }
                         Spacer(modifier = Modifier.height(16.dp))
-                        Button(
-                            onClick = onCheckoutClick,
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(16.dp)
-                        ) {
-                            Text("Proceed to Checkout")
+                        if (cart != null) {
+                            Button(
+                                onClick = {
+                                    val uiItems = cart!!.items.map { it.toOrderUi() }
+                                    onCheckoutClick(uiItems)
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(16.dp)
+                            ) { Text("Proceed to Checkout") }
                         }
                     }
                 }
@@ -105,6 +109,16 @@ fun CartScreen(
         }
     }
 }
+private fun CartItemResponse.toOrderUi(): OrderCartItemUi =
+    OrderCartItemUi(
+        id = this.id,
+        productName = this.productName,
+        color = this.color,
+        size = this.size,
+        unitPrice = this.unitPrice,
+        quantity = this.quantity,
+        imageUrl = this.imageUrl
+    )
 
 @Composable
 fun CartItemRow(item: CartItemResponse, viewModel: CartViewModel) {

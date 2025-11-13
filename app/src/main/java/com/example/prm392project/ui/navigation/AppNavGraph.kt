@@ -11,6 +11,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.example.prm392project.data.local.TokenStore
+import com.example.prm392project.data.model.OrderCartItemUi
 import com.example.prm392project.data.remote.api.AddressRequest
 import com.example.prm392project.data.remote.api.LoginRequest
 import com.example.prm392project.data.remote.api.RegisterRequest
@@ -23,12 +24,17 @@ import com.example.prm392project.ui.screens.auth.RegisterScreen
 import com.example.prm392project.ui.screens.cart.CartScreen
 import com.example.prm392project.ui.screens.category.CategoryManagementScreen
 import com.example.prm392project.ui.screens.main.HomeScreen
+import com.example.prm392project.ui.screens.order.OrderRoute
 import com.example.prm392project.ui.screens.product.ProductDetailScreen
 import com.example.prm392project.ui.screens.profile.ProfileScreen
+import kotlin.text.get
+import kotlin.text.set
 
 const val ROUTE_HOME = "home"
 const val ROUTE_PRODUCT_DETAIL = "product_detail"
 const val ROUTE_CART = "cart"
+
+const val ROUTE_ORDER = "order"
 const val ROUTE_LOGIN = "login"
 const val ROUTE_REGISTER = "register"
 const val ROUTE_MAIN = "main"
@@ -149,7 +155,27 @@ fun AppNavGraph(
         composable(ROUTE_CART) {
             CartScreen(
                 onBackClick = { navController.navigateUp() },
-                onCheckoutClick = { /* TODO */ }
+                onCheckoutClick = { uiItems ->
+                    // pass list to next destination
+                    navController.currentBackStackEntry
+                        ?.savedStateHandle
+                        ?.set("order_items", uiItems)
+                    navController.navigate(ROUTE_ORDER)
+                }
+            )
+        }
+
+        composable(ROUTE_ORDER) {
+            // read list from previous entry
+            val items: List<OrderCartItemUi> =
+                navController.previousBackStackEntry
+                    ?.savedStateHandle
+                    ?.get<List<OrderCartItemUi>>("order_items")
+                    ?: emptyList()
+
+            OrderRoute(
+                cartItems = items,
+                onOrderPlaced = { navController.popBackStack(ROUTE_HOME, false) }
             )
         }
     }

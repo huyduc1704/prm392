@@ -21,7 +21,8 @@ data class CartItemResponse(
     val size: String,
     val quantity: Int,
     val unitPrice: Double,
-    val subtotal: Double
+    val subtotal: Double,
+    val imageUrl: String
 )
 
 data class CartResponse(
